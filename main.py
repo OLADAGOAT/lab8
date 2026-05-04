@@ -15,6 +15,7 @@ TRAILS_LENGTH = 30
 
 TEST_MODE_ON = True
 TEST_DURATION = 2.0
+GROWTH_SPEED = 500
 
 
 @dataclass
@@ -24,6 +25,8 @@ class Square:
     life_span: float
     age: float = 0.0
     trail: List[Tuple[int, int]] = field(default_factory=list)
+    target_size: int = 0
+    growth_remaining_ms: int = 0
 
 
 def initialize_pygame() -> pygame.Surface:
@@ -45,6 +48,7 @@ def create_one_square(square_size: int) -> Square:
 
     square = Square(rect, (vx, vy), life_span)
     square.trail.append(square.rect.center)
+    square.target_size = square_size
     return square
 
 
@@ -70,9 +74,24 @@ def check_collision(a: Square, b: Square) -> bool:
     return a.rect.colliderect(b.rect)
 
 
-def grow_square(square: Square, prey_size: int) -> None:
+def start_growth(square: Square, prey_size: int) -> None:
     growth = max(1, prey_size // 4)
-    new_size = min(square.rect.width + growth, MAX_SQUARE_SIZE)
+    new_size = min(square.target_size + growth, MAX_SQUARE_SIZE)
+    square.target_size = new_size
+    square.growth_remaining_ms = GROWTH_SPEED
+
+
+def apply_animated_growth(square: Square, dt: float) -> None:
+    if square.growth_remaining_ms <= 0:
+        return
+
+    current_size = square.rect.width
+    if current_size >= square.target_size:
+        square.growth_remaining_ms = 0
+        return
+
+    growth_step = max(1, math.ceil((square.target_size - current_size) * dt * 1000 / square.growth_remaining_ms))
+    new_size = min(current_size + growth_step, square.target_size)
 
     center_x = square.rect.centerx
     center_y = square.rect.centery
@@ -82,6 +101,11 @@ def grow_square(square: Square, prey_size: int) -> None:
     square.rect.center = (center_x, center_y)
 
     square.velocity = (10 / new_size, 10 / new_size)
+
+    square.growth_remaining_ms -= int(dt * 1000)
+
+    if square.rect.width >= square.target_size:
+        square.growth_remaining_ms = 0
 
 
 def update_trail(square: Square) -> None:
@@ -112,6 +136,7 @@ def run_speed_test(square: Square, elapsed_time: float) -> None:
 def update_squares(squares: List[Square], dt: float) -> None:
     for i, square in enumerate(squares):
         square.age += dt
+        apply_animated_growth(square, dt)
 
         for j, other in enumerate(squares):
             if i != j:
@@ -168,12 +193,12 @@ def update_squares(squares: List[Square], dt: float) -> None:
             if check_collision(squares[i], squares[j]):
                 if squares[i].rect.width > squares[j].rect.width:
                     prey_size = squares[j].rect.width
-                    grow_square(squares[i], prey_size)
+                    start_growth(squares[i], prey_size)
                     squares[j] = create_one_square(prey_size)
 
                 elif squares[j].rect.width > squares[i].rect.width:
                     prey_size = squares[i].rect.width
-                    grow_square(squares[j], prey_size)
+                    start_growth(squares[j], prey_size)
                     squares[i] = create_one_square(prey_size)
 
     for i in range(len(squares) - 1, -1, -1):

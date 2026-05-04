@@ -1,261 +1,31 @@
-import math
-import random
-import pygame
-from dataclasses import dataclass, field
-from typing import List, Tuple
+## Exercise 7
 
-SCREEN_WIDTH = 500
-SCREEN_HEIGHT = 700
-FPS = 50
+The visual artifact is that trails can draw long strange lines when a square wraps from one side of the screen to the other.
 
-MIN_LIFE_SPAN = 3.0
-MAX_LIFE_SPAN = 8.0
-MAX_SQUARE_SIZE = 60
-TRAILS_LENGTH = 30
+This happens because the old trail point is on one side of the screen and the new point is on the opposite side, so pygame draws a line across the whole screen between those two points.
 
-TEST_MODE_ON = True
-TEST_DURATION = 2.0
-GROWTH_SPEED = 500
+A possible fix is to clear the trail when a square wraps around the screen, or to avoid drawing a line when the distance between two consecutive trail points is too large.
 
+## Exercise 8
 
-@dataclass
-class Square:
-    rect: pygame.Rect
-    velocity: Tuple[float, float]
-    life_span: float
-    age: float = 0.0
-    trail: List[Tuple[int, int]] = field(default_factory=list)
-    target_size: int = 0
-    growth_remaining_ms: int = 0
 
+Assumption:
+I test the movement speed of one square over time, using its velocity vector as the expected speed.
 
-def initialize_pygame() -> pygame.Surface:
-    pygame.init()
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("FLEEEEEEE")
-    return screen
+What I measure:
+I compare:
+- the expected speed from the velocity vector using math.hypot(vx, vy)
+- the measured speed from the difference between two consecutive recorded positions
 
+What I evaluate:
+If the measured movement per frame is close to the expected movement per frame, then the square is moving at the correct speed.
 
-def create_one_square(square_size: int) -> Square:
-    x = random.randint(0, SCREEN_WIDTH - square_size)
-    y = random.randint(0, SCREEN_HEIGHT - square_size)
+Limits of this test:
+This is only an approximate test because:
+- positions are converted to integers
+- random jitter is added to movement
+- chase/flee behavior can change the velocity during the simulation
+- screen wrapping can create sudden jumps
 
-    vx = 10 / square_size
-    vy = 10 / square_size
-
-    rect = pygame.Rect(x, y, square_size, square_size)
-    life_span = random.uniform(MIN_LIFE_SPAN, MAX_LIFE_SPAN)
-
-    square = Square(rect, (vx, vy), life_span)
-    square.trail.append(square.rect.center)
-    square.target_size = square_size
-    return square
-
-
-def create_squares() -> List[Square]:
-    squares: List[Square] = []
-
-    sizes = [25] * 5 + [10] * 10 + [4] * 30
-
-    for square_size in sizes:
-        squares.append(create_one_square(square_size))
-
-    return squares
-
-
-def handle_events() -> bool:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            return True
-    return False
-
-
-def check_collision(a: Square, b: Square) -> bool:
-    return a.rect.colliderect(b.rect)
-
-
-def start_growth(square: Square, prey_size: int) -> None:
-    growth = max(1, prey_size // 4)
-    new_size = min(square.target_size + growth, MAX_SQUARE_SIZE)
-    square.target_size = new_size
-    square.growth_remaining_ms = GROWTH_SPEED
-
-
-def apply_animated_growth(square: Square, dt: float) -> None:
-    if square.growth_remaining_ms <= 0:
-        return
-
-    current_size = square.rect.width
-    if current_size >= square.target_size:
-        square.growth_remaining_ms = 0
-        return
-
-    growth_step = max(1, math.ceil((square.target_size - current_size) * dt * 1000 / square.growth_remaining_ms))
-    new_size = min(current_size + growth_step, square.target_size)
-
-    center_x = square.rect.centerx
-    center_y = square.rect.centery
-
-    square.rect.width = new_size
-    square.rect.height = new_size
-    square.rect.center = (center_x, center_y)
-
-    square.velocity = (10 / new_size, 10 / new_size)
-
-    square.growth_remaining_ms -= int(dt * 1000)
-
-    if square.rect.width >= square.target_size:
-        square.growth_remaining_ms = 0
-
-
-def update_trail(square: Square) -> None:
-    square.trail.append(square.rect.center)
-
-    if len(square.trail) > TRAILS_LENGTH:
-        square.trail.pop(0)
-
-
-def run_speed_test(square: Square, elapsed_time: float) -> None:
-    if elapsed_time < TEST_DURATION:
-        expected_speed = math.hypot(square.velocity[0], square.velocity[1])
-
-        if len(square.trail) >= 2:
-            last_pos = square.trail[-2]
-            current_pos = square.trail[-1]
-
-            dx = current_pos[0] - last_pos[0]
-            dy = current_pos[1] - last_pos[1]
-            measured_speed = math.hypot(dx, dy)
-
-            print(
-                f"expected={expected_speed:.2f} px/frame | "
-                f"measured={measured_speed:.2f} px/frame"
-            )
-
-
-def update_squares(squares: List[Square], dt: float) -> None:
-    for i, square in enumerate(squares):
-        square.age += dt
-        apply_animated_growth(square, dt)
-
-        for j, other in enumerate(squares):
-            if i != j:
-                dx = other.rect.centerx - square.rect.centerx
-                dy = other.rect.centery - square.rect.centery
-                distance = (dx ** 2 + dy ** 2) ** 0.5
-
-                if 0 < distance < 150:
-                    dx /= distance
-                    dy /= distance
-
-                    if square.rect.width > other.rect.width:
-                        square.velocity = (
-                            square.velocity[0] + dx * 0.3,
-                            square.velocity[1] + dy * 0.5,
-                        )
-
-                    elif square.rect.width < other.rect.width:
-                        square.velocity = (
-                            square.velocity[0] - dx * 0.3,
-                            square.velocity[1] - dy * 0.5,
-                        )
-
-        square.rect.x += int(square.velocity[0])
-        square.rect.y += int(square.velocity[1])
-
-        square.rect.x += random.randint(-1, 1)
-        square.rect.y += random.randint(-1, 1)
-
-        wrapped = False
-
-        if square.rect.left > SCREEN_WIDTH:
-            square.rect.right = 0
-            wrapped = True
-        elif square.rect.right < 0:
-            square.rect.left = SCREEN_WIDTH
-            wrapped = True
-
-        if square.rect.top > SCREEN_HEIGHT:
-            square.rect.bottom = 0
-            wrapped = True
-        elif square.rect.bottom < 0:
-            square.rect.top = SCREEN_HEIGHT
-            wrapped = True
-
-        if wrapped:
-            square.trail.clear()
-            square.trail.append(square.rect.center)
-
-        update_trail(square)
-
-    for i in range(len(squares)):
-        for j in range(i + 1, len(squares)):
-            if check_collision(squares[i], squares[j]):
-                if squares[i].rect.width > squares[j].rect.width:
-                    prey_size = squares[j].rect.width
-                    start_growth(squares[i], prey_size)
-                    squares[j] = create_one_square(prey_size)
-
-                elif squares[j].rect.width > squares[i].rect.width:
-                    prey_size = squares[i].rect.width
-                    start_growth(squares[j], prey_size)
-                    squares[i] = create_one_square(prey_size)
-
-    for i in range(len(squares) - 1, -1, -1):
-        if squares[i].age >= squares[i].life_span:
-            same_size = squares[i].rect.width
-            squares.pop(i)
-            squares.append(create_one_square(same_size))
-
-
-def draw_squares(screen: pygame.Surface, squares: List[Square], fps: float) -> None:
-    screen.fill((30, 30, 30))
-
-    for square in squares:
-        if len(square.trail) > 1:
-            for i in range(len(square.trail) - 1):
-                pygame.draw.line(
-                    screen,
-                    (100, 100, 100),
-                    square.trail[i],
-                    square.trail[i + 1],
-                    1,
-                )
-
-        pygame.draw.rect(screen, (255, 255, 255), square.rect)
-
-    font = pygame.font.Font(None, 28)
-    fps_text = font.render(f"FPS: {fps:.1f}", True, (255, 255, 255))
-    screen.blit(fps_text, (10, 10))
-
-    pygame.display.flip()
-
-
-def main() -> None:
-    screen = initialize_pygame()
-    squares = create_squares()
-    clock = pygame.time.Clock()
-
-    running = True
-    elapsed_time = 0.0
-
-    while running:
-        if handle_events():
-            running = False
-            continue
-
-        dt = clock.tick(FPS) / 1000.0
-        elapsed_time += dt
-
-        update_squares(squares, dt)
-
-        if TEST_MODE_ON and len(squares) > 0:
-            run_speed_test(squares[0], elapsed_time)
-
-        draw_squares(screen, squares, clock.get_fps())
-
-    pygame.quit()
-
-
-if __name__ == "__main__":
-    main()
+How it could be improved:
+A more reliable test would disable random movement, disable interactions with other squares, and test one square moving alone in a straight line.
