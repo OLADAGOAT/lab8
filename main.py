@@ -103,6 +103,17 @@ def update_squares(squares: List[Square], dt: float) -> None:
         elif square.rect.bottom < 0:
             square.rect.top = SCREEN_HEIGHT
 
+    for i in range(len(squares)):
+        for j in range(i + 1, len(squares)):
+            if check_collision(squares[i], squares[j]):
+                if squares[i].rect.width > squares[j].rect.width:
+                    eaten_size = squares[j].rect.width
+                    squares[j] = create_one_square(eaten_size)
+
+                elif squares[j].rect.width > squares[i].rect.width:
+                    eaten_size = squares[i].rect.width
+                    squares[i] = create_one_square(eaten_size)
+
     for i in range(len(squares) - 1, -1, -1):
         if squares[i].age >= squares[i].life_span:
             same_size = squares[i].rect.width
