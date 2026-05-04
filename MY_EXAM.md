@@ -1,10 +1,3 @@
-
-
-## Exercise 7
-
-I did not finish the trails feature.
-If I had more time, I would store the last positions of each square in a list and draw lines between consecutive points with pygame.draw.line().
-
 ## Exercise 8
 
 I did not implement the speed test in code.
