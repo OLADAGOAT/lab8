@@ -77,3 +77,20 @@ A simple success rule could be:
 ### Limits
 
 This test would not prove perfect flocking, but it would give measurable evidence that the three S.A.C. behaviors are happening together.
+
+## Exercise 16
+
+I implemented a simple S.A.C. test in code.
+
+The test runs the simulation with separation, alignment, and cohesion enabled.
+After a fixed number of frames, it measures:
+- average neighbor distance
+- average heading difference
+- average distance to local group center
+
+The test returns PASS if:
+- boids are not too close
+- boids have similar headings
+- boids stay reasonably grouped
+
+This is still a simplified test, but it gives measurable evidence that flocking is happening.

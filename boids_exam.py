@@ -40,6 +40,9 @@ class Config:
 
 config = Config()
 
+TEST_MODE_ON: bool = True
+TEST_FRAMES: int = 300
+
 # Main Boid class representing each boid in the simulation
 class Boid:
     def __init__(self) -> None:
@@ -53,7 +56,20 @@ class Boid:
 
     # TODO: Implement speed clamping to ensure boids don't exceed max speed
     def _clampSpeed(self) -> None:
-        pass
+        speed: float = math.hypot(self.vx, self.vy)
+
+        if speed == 0:
+            return
+
+        if speed > config.BOID_SPEED_MAX:
+            scale: float = config.BOID_SPEED_MAX / speed
+            self.vx *= scale
+            self.vy *= scale
+
+        if speed < config.BOID_SPEED_MIN:
+            scale = config.BOID_SPEED_MIN / speed
+            self.vx *= scale
+            self.vy *= scale
 
     # TODO: Implement Screen Wrapping
     # Screen wrapping: if a boid goes off one edge of the screen, 
@@ -196,6 +212,8 @@ class Boid:
             self.vx += cohesion.x * config.COHESION_STEER_STRENGTH
             self.vy += cohesion.y * config.COHESION_STEER_STRENGTH
 
+        self._clampSpeed()
+
         # Update the boid's position based on its velocity.
         self.x += self.vx * dt_seconds
         self.y += self.vy * dt_seconds
@@ -219,7 +237,7 @@ class Boid:
         pygame.draw.polygon(screen, (255, 255, 255), points)
 
 # Draw HUD (Heads Up Display) with FPS and behavior statuses
-def draw_hud(screen: pygame.Surface, font: pygame.font.Font, config: Config, fps: float) -> None:
+def draw_hud(screen: pygame.Surface, font: pygame.font.Font, config: Config, fps: float, sac_result: str) -> None:
     # Draw separation status and alignment and FPS on the screen
     text: str = f"FPS: {fps:.2f}   (Press 'ESC' or 'Q' to quit)"
     img: pygame.Surface = font.render(text, True, (255, 255, 255))
@@ -236,7 +254,62 @@ def draw_hud(screen: pygame.Surface, font: pygame.font.Font, config: Config, fps
     text: str = f"Wall Behavior: {config.WALL_BEHAVIOR.capitalize()} - Press 'W' to toggle"
     img = font.render(text, True, (255, 255, 255))
     screen.blit(img, (10, 70))
+    text = f"SAC Test: {sac_result}"
+    img = font.render(text, True, (255, 255, 255))
+    screen.blit(img, (10, 85))
 
+
+def run_sac_test(boids: List[Boid]) -> str:
+    total_neighbor_distance: float = 0.0
+    total_heading_difference: float = 0.0
+    total_center_distance: float = 0.0
+    neighbor_count: int = 0
+
+    for boid in boids:
+        center_sum: pygame.Vector2 = pygame.Vector2(0, 0)
+        velocity_sum: pygame.Vector2 = pygame.Vector2(0, 0)
+        local_count: int = 0
+
+        for other in boids:
+            if other is not boid:
+                distance: float = math.hypot(boid.x - other.x, boid.y - other.y)
+
+                if distance < config.ALIGNMENT_DISTANCE:
+                    total_neighbor_distance += distance
+                    center_sum += pygame.Vector2(other.x, other.y)
+                    velocity_sum += pygame.Vector2(other.vx, other.vy)
+                    local_count += 1
+                    neighbor_count += 1
+
+        if local_count > 0:
+            center: pygame.Vector2 = center_sum / local_count
+            total_center_distance += math.hypot(boid.x - center.x, boid.y - center.y)
+
+            avg_velocity: pygame.Vector2 = velocity_sum / local_count
+            boid_angle: float = math.atan2(boid.vy, boid.vx)
+            avg_angle: float = math.atan2(avg_velocity.y, avg_velocity.x)
+            angle_diff: float = abs(boid_angle - avg_angle)
+
+            if angle_diff > math.pi:
+                angle_diff = 2 * math.pi - angle_diff
+
+            total_heading_difference += angle_diff
+
+    if neighbor_count == 0:
+        return "No neighbors detected"
+
+    avg_neighbor_distance: float = total_neighbor_distance / neighbor_count
+    avg_heading_difference: float = total_heading_difference / len(boids)
+    avg_center_distance: float = total_center_distance / len(boids)
+
+    separation_ok: bool = avg_neighbor_distance > config.BOID_SIZE * 3
+    alignment_ok: bool = avg_heading_difference < 1.0
+    cohesion_ok: bool = avg_center_distance < config.COHESION_DISTANCE * 1.5
+
+    if separation_ok and alignment_ok and cohesion_ok:
+        return "PASS"
+
+    return "FAIL"
 
 # Main function to run the simulation
 def run_simulation() -> None:
@@ -249,9 +322,18 @@ def run_simulation() -> None:
 
     # Create boids
     boids: List[Boid] = [Boid() for _ in range(Config.NUM_BOIDS)]
+
+    if TEST_MODE_ON:
+        config.SEPARATION_ON = True
+        config.ALIGNEMENT_ON = True
+        config.COHESION_ON = True
+        config.WALL_BEHAVIOR = "wrap"
     
     # Main loop
     running: bool = True
+    frame_count: int = 0
+    sac_result: str = "RUNNING"
+
     while running:
         dt: int = clock.tick(60)  # Elapsed time in milliseconds since last frame
         fps: float = clock.get_fps() # Current frames per second
@@ -280,8 +362,13 @@ def run_simulation() -> None:
             boid.update(boids, dt)
             boid.draw(screen)
 
+        if TEST_MODE_ON:
+            frame_count += 1
+            if frame_count >= TEST_FRAMES:
+                sac_result = run_sac_test(boids)
+
         # Draw HUD (Heads Up Display) with FPS and behavior statuses
-        draw_hud(screen, font, config, fps)
+        draw_hud(screen, font, config, fps, sac_result)
         pygame.display.flip()
 
     pygame.quit()
