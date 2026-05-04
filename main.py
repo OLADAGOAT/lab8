@@ -5,9 +5,6 @@ from typing import List, Tuple
 
 SCREEN_WIDTH = 500
 SCREEN_HEIGHT = 700
-MIN_SQUARE_SIZE = 5
-MAX_SQUARE_SIZE = 50
-SQUARE_COUNT = 20
 FPS = 50
 
 MIN_LIFE_SPAN = 3.0
@@ -29,8 +26,7 @@ def initialize_pygame() -> pygame.Surface:
     return screen
 
 
-def create_one_square() -> Square:
-    square_size = random.randint(MIN_SQUARE_SIZE, MAX_SQUARE_SIZE)
+def create_one_square(square_size: int) -> Square:
     x = random.randint(0, SCREEN_WIDTH - square_size)
     y = random.randint(0, SCREEN_HEIGHT - square_size)
 
@@ -43,10 +39,14 @@ def create_one_square() -> Square:
     return Square(rect, (vx, vy), life_span)
 
 
-def create_squares(count: int) -> List[Square]:
+def create_squares() -> List[Square]:
     squares: List[Square] = []
-    for _ in range(count):
-        squares.append(create_one_square())
+
+    sizes = [25] * 5 + [10] * 10 + [4] * 30
+
+    for square_size in sizes:
+        squares.append(create_one_square(square_size))
+
     return squares
 
 
@@ -71,14 +71,12 @@ def update_squares(squares: List[Square], dt: float) -> None:
                     dx /= distance
                     dy /= distance
 
-                    # Big square chases smaller square
                     if square.rect.width > other.rect.width:
                         square.velocity = (
                             square.velocity[0] + dx * 0.3,
                             square.velocity[1] + dy * 0.5,
                         )
 
-                    # Small square flees bigger square
                     elif square.rect.width < other.rect.width:
                         square.velocity = (
                             square.velocity[0] - dx * 0.3,
@@ -101,8 +99,9 @@ def update_squares(squares: List[Square], dt: float) -> None:
 
     for i in range(len(squares) - 1, -1, -1):
         if squares[i].age >= squares[i].life_span:
+            same_size = squares[i].rect.width
             squares.pop(i)
-            squares.append(create_one_square())
+            squares.append(create_one_square(same_size))
 
 
 def draw_squares(screen: pygame.Surface, squares: List[Square], fps: float) -> None:
@@ -120,7 +119,7 @@ def draw_squares(screen: pygame.Surface, squares: List[Square], fps: float) -> N
 
 def main() -> None:
     screen = initialize_pygame()
-    squares = create_squares(SQUARE_COUNT)
+    squares = create_squares()
     clock = pygame.time.Clock()
 
     running = True
