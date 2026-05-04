@@ -1,7 +1,7 @@
 import math
 import random
 import pygame
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Tuple
 
 SCREEN_WIDTH = 500
@@ -11,10 +11,6 @@ FPS = 50
 MIN_LIFE_SPAN = 3.0
 MAX_LIFE_SPAN = 8.0
 MAX_SQUARE_SIZE = 60
-TRAILS_LENGTH = 30
-
-TEST_MODE_ON = True
-TEST_DURATION = 2.0
 GROWTH_SPEED = 500
 
 
@@ -24,7 +20,6 @@ class Square:
     velocity: Tuple[float, float]
     life_span: float
     age: float = 0.0
-    trail: List[Tuple[int, int]] = field(default_factory=list)
     target_size: int = 0
     growth_remaining_ms: int = 0
 
@@ -32,33 +27,27 @@ class Square:
 def initialize_pygame() -> pygame.Surface:
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("FLEEEEEEE")
+    pygame.display.set_caption("Moving Squares")
     return screen
 
 
-def create_one_square(square_size: int) -> Square:
-    x = random.randint(0, SCREEN_WIDTH - square_size)
-    y = random.randint(0, SCREEN_HEIGHT - square_size)
+def create_one_square(size: int) -> Square:
+    x = random.randint(0, SCREEN_WIDTH - size)
+    y = random.randint(0, SCREEN_HEIGHT - size)
 
-    vx = 10 / square_size
-    vy = 10 / square_size
-
-    rect = pygame.Rect(x, y, square_size, square_size)
+    speed = 10 / size
+    rect = pygame.Rect(x, y, size, size)
     life_span = random.uniform(MIN_LIFE_SPAN, MAX_LIFE_SPAN)
 
-    square = Square(rect, (vx, vy), life_span)
-    square.trail.append(square.rect.center)
-    square.target_size = square_size
-    return square
+    return Square(rect, (speed, speed), life_span, 0.0, size, 0)
 
 
 def create_squares() -> List[Square]:
+    sizes = [25] * 5 + [10] * 10 + [4] * 30
     squares: List[Square] = []
 
-    sizes = [25] * 5 + [10] * 10 + [4] * 30
-
-    for square_size in sizes:
-        squares.append(create_one_square(square_size))
+    for size in sizes:
+        squares.append(create_one_square(size))
 
     return squares
 
@@ -76,16 +65,16 @@ def check_collision(a: Square, b: Square) -> bool:
 
 def start_growth(square: Square, prey_size: int) -> None:
     growth = max(1, prey_size // 4)
-    new_size = min(square.target_size + growth, MAX_SQUARE_SIZE)
-    square.target_size = new_size
+    square.target_size = min(square.target_size + growth, MAX_SQUARE_SIZE)
     square.growth_remaining_ms = GROWTH_SPEED
 
 
-def apply_animated_growth(square: Square, dt: float) -> None:
+def apply_growth(square: Square, dt: float) -> None:
     if square.growth_remaining_ms <= 0:
         return
 
     current_size = square.rect.width
+
     if current_size >= square.target_size:
         square.growth_remaining_ms = 0
         return
@@ -93,14 +82,13 @@ def apply_animated_growth(square: Square, dt: float) -> None:
     growth_step = max(1, math.ceil((square.target_size - current_size) * dt * 1000 / square.growth_remaining_ms))
     new_size = min(current_size + growth_step, square.target_size)
 
-    center_x = square.rect.centerx
-    center_y = square.rect.centery
-
+    center = square.rect.center
     square.rect.width = new_size
     square.rect.height = new_size
-    square.rect.center = (center_x, center_y)
+    square.rect.center = center
 
-    square.velocity = (10 / new_size, 10 / new_size)
+    speed = 10 / new_size
+    square.velocity = (speed, speed)
 
     square.growth_remaining_ms -= int(dt * 1000)
 
@@ -108,57 +96,49 @@ def apply_animated_growth(square: Square, dt: float) -> None:
         square.growth_remaining_ms = 0
 
 
-def update_trail(square: Square) -> None:
-    square.trail.append(square.rect.center)
+def wrap_square(square: Square) -> None:
+    if square.rect.left > SCREEN_WIDTH:
+        square.rect.right = 0
+    elif square.rect.right < 0:
+        square.rect.left = SCREEN_WIDTH
 
-    if len(square.trail) > TRAILS_LENGTH:
-        square.trail.pop(0)
+    if square.rect.top > SCREEN_HEIGHT:
+        square.rect.bottom = 0
+    elif square.rect.bottom < 0:
+        square.rect.top = SCREEN_HEIGHT
 
 
-def run_speed_test(square: Square, elapsed_time: float) -> None:
-    if elapsed_time < TEST_DURATION:
-        expected_speed = math.hypot(square.velocity[0], square.velocity[1])
+def move_away_or_toward(square: Square, other: Square) -> None:
+    dx = other.rect.centerx - square.rect.centerx
+    dy = other.rect.centery - square.rect.centery
+    distance = math.hypot(dx, dy)
 
-        if len(square.trail) >= 2:
-            last_pos = square.trail[-2]
-            current_pos = square.trail[-1]
+    if distance == 0 or distance >= 150:
+        return
 
-            dx = current_pos[0] - last_pos[0]
-            dy = current_pos[1] - last_pos[1]
-            measured_speed = math.hypot(dx, dy)
+    dx /= distance
+    dy /= distance
 
-            print(
-                f"expected={expected_speed:.2f} px/frame | "
-                f"measured={measured_speed:.2f} px/frame"
-            )
+    vx, vy = square.velocity
+
+    if square.rect.width > other.rect.width:
+        vx += dx * 0.3
+        vy += dy * 0.5
+    elif square.rect.width < other.rect.width:
+        vx -= dx * 0.3
+        vy -= dy * 0.5
+
+    square.velocity = (vx, vy)
 
 
 def update_squares(squares: List[Square], dt: float) -> None:
     for i, square in enumerate(squares):
         square.age += dt
-        apply_animated_growth(square, dt)
+        apply_growth(square, dt)
 
         for j, other in enumerate(squares):
             if i != j:
-                dx = other.rect.centerx - square.rect.centerx
-                dy = other.rect.centery - square.rect.centery
-                distance = (dx ** 2 + dy ** 2) ** 0.5
-
-                if 0 < distance < 150:
-                    dx /= distance
-                    dy /= distance
-
-                    if square.rect.width > other.rect.width:
-                        square.velocity = (
-                            square.velocity[0] + dx * 0.3,
-                            square.velocity[1] + dy * 0.5,
-                        )
-
-                    elif square.rect.width < other.rect.width:
-                        square.velocity = (
-                            square.velocity[0] - dx * 0.3,
-                            square.velocity[1] - dy * 0.5,
-                        )
+                move_away_or_toward(square, other)
 
         square.rect.x += int(square.velocity[0])
         square.rect.y += int(square.velocity[1])
@@ -166,27 +146,7 @@ def update_squares(squares: List[Square], dt: float) -> None:
         square.rect.x += random.randint(-1, 1)
         square.rect.y += random.randint(-1, 1)
 
-        wrapped = False
-
-        if square.rect.left > SCREEN_WIDTH:
-            square.rect.right = 0
-            wrapped = True
-        elif square.rect.right < 0:
-            square.rect.left = SCREEN_WIDTH
-            wrapped = True
-
-        if square.rect.top > SCREEN_HEIGHT:
-            square.rect.bottom = 0
-            wrapped = True
-        elif square.rect.bottom < 0:
-            square.rect.top = SCREEN_HEIGHT
-            wrapped = True
-
-        if wrapped:
-            square.trail.clear()
-            square.trail.append(square.rect.center)
-
-        update_trail(square)
+        wrap_square(square)
 
     for i in range(len(squares)):
         for j in range(i + 1, len(squares)):
@@ -212,16 +172,6 @@ def draw_squares(screen: pygame.Surface, squares: List[Square], fps: float) -> N
     screen.fill((30, 30, 30))
 
     for square in squares:
-        if len(square.trail) > 1:
-            for i in range(len(square.trail) - 1):
-                pygame.draw.line(
-                    screen,
-                    (100, 100, 100),
-                    square.trail[i],
-                    square.trail[i + 1],
-                    1,
-                )
-
         pygame.draw.rect(screen, (255, 255, 255), square.rect)
 
     font = pygame.font.Font(None, 28)
@@ -237,21 +187,13 @@ def main() -> None:
     clock = pygame.time.Clock()
 
     running = True
-    elapsed_time = 0.0
-
     while running:
         if handle_events():
             running = False
             continue
 
         dt = clock.tick(FPS) / 1000.0
-        elapsed_time += dt
-
         update_squares(squares, dt)
-
-        if TEST_MODE_ON and len(squares) > 0:
-            run_speed_test(squares[0], elapsed_time)
-
         draw_squares(screen, squares, clock.get_fps())
 
     pygame.quit()

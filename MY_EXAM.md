@@ -19,3 +19,4 @@ If I had more time, I would measure average neighbor distance, heading similarit
 
 I did not implement the S.A.C. test in code.
 The boids simulation still runs with separation, alignment, and cohesion.
+If I had more time, I would add a test that measures average neighbor distance, heading similarity, and distance to local group center. 
