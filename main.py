@@ -1,6 +1,6 @@
 import random
 import pygame
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Tuple
 
 SCREEN_WIDTH = 500
@@ -10,6 +10,7 @@ FPS = 50
 MIN_LIFE_SPAN = 3.0
 MAX_LIFE_SPAN = 8.0
 MAX_SQUARE_SIZE = 60
+TRAILS_LENGTH = 30
 
 
 @dataclass
@@ -18,6 +19,7 @@ class Square:
     velocity: Tuple[float, float]
     life_span: float
     age: float = 0.0
+    trail: List[Tuple[int, int]] = field(default_factory=list)
 
 
 def initialize_pygame() -> pygame.Surface:
@@ -37,7 +39,9 @@ def create_one_square(square_size: int) -> Square:
     rect = pygame.Rect(x, y, square_size, square_size)
     life_span = random.uniform(MIN_LIFE_SPAN, MAX_LIFE_SPAN)
 
-    return Square(rect, (vx, vy), life_span)
+    square = Square(rect, (vx, vy), life_span)
+    square.trail.append(square.rect.center)
+    return square
 
 
 def create_squares() -> List[Square]:
@@ -74,6 +78,13 @@ def grow_square(square: Square, prey_size: int) -> None:
     square.rect.center = (center_x, center_y)
 
     square.velocity = (10 / new_size, 10 / new_size)
+
+
+def update_trail(square: Square) -> None:
+    square.trail.append(square.rect.center)
+
+    if len(square.trail) > TRAILS_LENGTH:
+        square.trail.pop(0)
 
 
 def update_squares(squares: List[Square], dt: float) -> None:
@@ -118,6 +129,8 @@ def update_squares(squares: List[Square], dt: float) -> None:
         elif square.rect.bottom < 0:
             square.rect.top = SCREEN_HEIGHT
 
+        update_trail(square)
+
     for i in range(len(squares)):
         for j in range(i + 1, len(squares)):
             if check_collision(squares[i], squares[j]):
@@ -142,6 +155,16 @@ def draw_squares(screen: pygame.Surface, squares: List[Square], fps: float) -> N
     screen.fill((30, 30, 30))
 
     for square in squares:
+        if len(square.trail) > 1:
+            for i in range(len(square.trail) - 1):
+                pygame.draw.line(
+                    screen,
+                    (100, 100, 100),
+                    square.trail[i],
+                    square.trail[i + 1],
+                    1,
+                )
+
         pygame.draw.rect(screen, (255, 255, 255), square.rect)
 
     font = pygame.font.Font(None, 28)
