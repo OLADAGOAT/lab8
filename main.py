@@ -3,8 +3,8 @@ import pygame
 from dataclasses import dataclass
 from typing import List, Tuple
 
-SCREEN_WIDTH = 300
-SCREEN_HEIGHT = 500
+SCREEN_WIDTH = 500
+SCREEN_HEIGHT = 700
 MIN_SQUARE_SIZE = 5
 MAX_SQUARE_SIZE = 50
 SQUARE_COUNT = 20
@@ -25,7 +25,7 @@ class Square:
 def initialize_pygame() -> pygame.Surface:
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("FLEE AND DIE")
+    pygame.display.set_caption("FLEEEEEEE")
     return screen
 
 
@@ -34,8 +34,8 @@ def create_one_square() -> Square:
     x = random.randint(0, SCREEN_WIDTH - square_size)
     y = random.randint(0, SCREEN_HEIGHT - square_size)
 
-    vx = 5 / square_size
-    vy = 5 / square_size
+    vx = 10 / square_size
+    vy = 10 / square_size
 
     rect = pygame.Rect(x, y, square_size, square_size)
     life_span = random.uniform(MIN_LIFE_SPAN, MAX_LIFE_SPAN)
@@ -62,18 +62,28 @@ def update_squares(squares: List[Square], dt: float) -> None:
         square.age += dt
 
         for j, other in enumerate(squares):
-            if i != j and other.rect.width > square.rect.width:
-                dx = square.rect.centerx - other.rect.centerx
-                dy = square.rect.centery - other.rect.centery
+            if i != j:
+                dx = other.rect.centerx - square.rect.centerx
+                dy = other.rect.centery - square.rect.centery
                 distance = (dx ** 2 + dy ** 2) ** 0.5
 
                 if 0 < distance < 150:
                     dx /= distance
                     dy /= distance
-                    square.velocity = (
-                        square.velocity[0] + dx * 2,
-                        square.velocity[1] + dy * 2,
-                    )
+
+                    # Big square chases smaller square
+                    if square.rect.width > other.rect.width:
+                        square.velocity = (
+                            square.velocity[0] + dx * 0.3,
+                            square.velocity[1] + dy * 0.5,
+                        )
+
+                    # Small square flees bigger square
+                    elif square.rect.width < other.rect.width:
+                        square.velocity = (
+                            square.velocity[0] - dx * 0.3,
+                            square.velocity[1] - dy * 0.5,
+                        )
 
         square.rect.x += int(square.velocity[0])
         square.rect.y += int(square.velocity[1])
@@ -106,35 +116,6 @@ def draw_squares(screen: pygame.Surface, squares: List[Square], fps: float) -> N
     screen.blit(fps_text, (10, 10))
 
     pygame.display.flip()
-
-def update_squares(squares: List[Square], dt: float) -> None:
-    for i, square in enumerate(squares):
-        square.age += dt
-
-        for j, other in enumerate(squares):
-            if i != j:
-                dx = square.rect.centerx - other.rect.centerx
-                dy = square.rect.centery - other.rect.centery
-                distance = (dx ** 2 + dy ** 2) ** 0.5
-
-                if distance < 150:
-                    if square.rect.width > other.rect.width:
-                        square.velocity = (
-                            square.velocity[0] - dx,
-                            square.velocity[1] - dy,
-                        )
-                    elif square.rect.width < other.rect.width:
-                        square.velocity = (
-                            square.velocity[0] + dx,
-                            square.velocity[1] + dy,
-                        )
-
-        square.rect.x += int(square.velocity[0])
-        square.rect.y += int(square.velocity[1])
-
-    for i in range(len(squares) - 1, -1, -1):
-        if squares[i].age >= squares[i].life_span:
-            squares[i] = create_one_square()
 
 
 def main() -> None:
