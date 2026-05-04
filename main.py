@@ -9,6 +9,7 @@ FPS = 50
 
 MIN_LIFE_SPAN = 3.0
 MAX_LIFE_SPAN = 8.0
+MAX_SQUARE_SIZE = 60
 
 
 @dataclass
@@ -61,6 +62,20 @@ def check_collision(a: Square, b: Square) -> bool:
     return a.rect.colliderect(b.rect)
 
 
+def grow_square(square: Square, prey_size: int) -> None:
+    growth = max(1, prey_size // 4)
+    new_size = min(square.rect.width + growth, MAX_SQUARE_SIZE)
+
+    center_x = square.rect.centerx
+    center_y = square.rect.centery
+
+    square.rect.width = new_size
+    square.rect.height = new_size
+    square.rect.center = (center_x, center_y)
+
+    square.velocity = (10 / new_size, 10 / new_size)
+
+
 def update_squares(squares: List[Square], dt: float) -> None:
     for i, square in enumerate(squares):
         square.age += dt
@@ -107,12 +122,14 @@ def update_squares(squares: List[Square], dt: float) -> None:
         for j in range(i + 1, len(squares)):
             if check_collision(squares[i], squares[j]):
                 if squares[i].rect.width > squares[j].rect.width:
-                    eaten_size = squares[j].rect.width
-                    squares[j] = create_one_square(eaten_size)
+                    prey_size = squares[j].rect.width
+                    grow_square(squares[i], prey_size)
+                    squares[j] = create_one_square(prey_size)
 
                 elif squares[j].rect.width > squares[i].rect.width:
-                    eaten_size = squares[i].rect.width
-                    squares[i] = create_one_square(eaten_size)
+                    prey_size = squares[i].rect.width
+                    grow_square(squares[j], prey_size)
+                    squares[i] = create_one_square(prey_size)
 
     for i in range(len(squares) - 1, -1, -1):
         if squares[i].age >= squares[i].life_span:
