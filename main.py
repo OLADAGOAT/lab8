@@ -57,6 +57,10 @@ def handle_events() -> bool:
     return False
 
 
+def check_collision(a: Square, b: Square) -> bool:
+    return a.rect.colliderect(b.rect)
+
+
 def update_squares(squares: List[Square], dt: float) -> None:
     for i, square in enumerate(squares):
         square.age += dt
@@ -89,7 +93,6 @@ def update_squares(squares: List[Square], dt: float) -> None:
         square.rect.x += random.randint(-1, 1)
         square.rect.y += random.randint(-1, 1)
 
-        # Screen wrapping instead of bouncing
         if square.rect.left > SCREEN_WIDTH:
             square.rect.right = 0
         elif square.rect.right < 0:
