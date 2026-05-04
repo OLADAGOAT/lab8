@@ -65,9 +65,9 @@ If flocking is working:
 
 ### How I would implement it
 
-I would create a test mode with global variables.
-During the test, I would collect boid positions and velocities over many frames.
-Then I would calculate summary values for separation, alignment, and cohesion.
+i will create a testing mode with global varriables.
+during the test, I would collect boid positions and velocities over many frames.
+and i would calculate summary values for separation, alignment, and cohesion.
 
 A simple success rule could be:
 - average neighbor distance stays above a minimum threshold
@@ -80,17 +80,17 @@ This test would not prove perfect flocking, but it would give measurable evidenc
 
 ## Exercise 16
 
-I implemented a simple S.A.C. test in code.
+i implemented a simple S.A.C. test in code.
 
-The test runs the simulation with separation, alignment, and cohesion enabled.
-After a fixed number of frames, it measures:
+the test runs the simulation with separation, alignment, and cohesion enabled.
+after a fixed number of frames, it measures:
 - average neighbor distance
 - average heading difference
 - average distance to local group center
 
-The test returns PASS if:
-- boids are not too close
-- boids have similar headings
+the test returns pass if:
+- boids are not close to each other
+- boids has similar headings
 - boids stay reasonably grouped
 
 this is still a simplified test but it gives enough evidence that flocking is happening
