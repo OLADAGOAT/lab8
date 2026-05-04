@@ -1,3 +1,4 @@
+import math
 import random
 import pygame
 from dataclasses import dataclass, field
@@ -11,6 +12,9 @@ MIN_LIFE_SPAN = 3.0
 MAX_LIFE_SPAN = 8.0
 MAX_SQUARE_SIZE = 60
 TRAILS_LENGTH = 30
+
+TEST_MODE_ON = True
+TEST_DURATION = 2.0
 
 
 @dataclass
@@ -87,6 +91,24 @@ def update_trail(square: Square) -> None:
         square.trail.pop(0)
 
 
+def run_speed_test(square: Square, elapsed_time: float) -> None:
+    if elapsed_time < TEST_DURATION:
+        expected_speed = math.hypot(square.velocity[0], square.velocity[1])
+
+        if len(square.trail) >= 2:
+            last_pos = square.trail[-2]
+            current_pos = square.trail[-1]
+
+            dx = current_pos[0] - last_pos[0]
+            dy = current_pos[1] - last_pos[1]
+            measured_speed = math.hypot(dx, dy)
+
+            print(
+                f"expected={expected_speed:.2f} px/frame | "
+                f"measured={measured_speed:.2f} px/frame"
+            )
+
+
 def update_squares(squares: List[Square], dt: float) -> None:
     for i, square in enumerate(squares):
         square.age += dt
@@ -119,15 +141,25 @@ def update_squares(squares: List[Square], dt: float) -> None:
         square.rect.x += random.randint(-1, 1)
         square.rect.y += random.randint(-1, 1)
 
+        wrapped = False
+
         if square.rect.left > SCREEN_WIDTH:
             square.rect.right = 0
+            wrapped = True
         elif square.rect.right < 0:
             square.rect.left = SCREEN_WIDTH
+            wrapped = True
 
         if square.rect.top > SCREEN_HEIGHT:
             square.rect.bottom = 0
+            wrapped = True
         elif square.rect.bottom < 0:
             square.rect.top = SCREEN_HEIGHT
+            wrapped = True
+
+        if wrapped:
+            square.trail.clear()
+            square.trail.append(square.rect.center)
 
         update_trail(square)
 
@@ -180,13 +212,21 @@ def main() -> None:
     clock = pygame.time.Clock()
 
     running = True
+    elapsed_time = 0.0
+
     while running:
         if handle_events():
             running = False
             continue
 
         dt = clock.tick(FPS) / 1000.0
+        elapsed_time += dt
+
         update_squares(squares, dt)
+
+        if TEST_MODE_ON and len(squares) > 0:
+            run_speed_test(squares[0], elapsed_time)
+
         draw_squares(screen, squares, clock.get_fps())
 
     pygame.quit()
