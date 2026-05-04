@@ -93,4 +93,4 @@ The test returns PASS if:
 - boids have similar headings
 - boids stay reasonably grouped
 
-This is still a simplified test, but it gives measurable evidence that flocking is happening.
+this is still a simplified test but it gives enough evidence that flocking is happening
